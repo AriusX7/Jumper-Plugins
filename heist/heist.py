@@ -481,6 +481,7 @@ class Heist:
         """This begins a Heist"""
         author = ctx.message.author
         server = ctx.message.server
+        channel = ctx.message.channel
         settings = self.check_server_settings(server)
         cost = settings["Config"]["Heist Cost"]
         wait_time = settings["Config"]["Wait Time"]
@@ -501,6 +502,7 @@ class Heist:
             self.subtract_costs(author, cost)
             settings["Config"]["Heist Planned"] = True
             settings["Crew"][author.id] = {}
+            settings["SurvivingCrew"][author.id] = {}
             await self.bot.say("A {4} is being planned by {0}\nThe {4} "
                                "will begin in {1} seconds. Type {2}heist play to join their "
                                "{3}.".format(author.name, wait_time, ctx.prefix, t_crew, t_heist))
@@ -511,11 +513,12 @@ class Heist:
                                    "{} has been cancelled.".format(t_crew, t_heist))
                 self.reset_heist(settings)
             else:
-                await self.heist_game(settings, server, t_heist, t_crew, t_vault)
+                await self.heist_game(settings, server, t_heist, t_crew, t_vault, channel)
 
         else:
             self.subtract_costs(author, cost)
             settings["Crew"][author.id] = {}
+            settings["SurvivingCrew"][author.id] = {}
             crew_size = len(settings["Crew"])
             await self.bot.say("{0} has joined the {2}.\nThe {2} now has {1} "
                                "members.".format(author.name, crew_size, t_crew))
@@ -718,26 +721,39 @@ class Heist:
         except asyncio.CancelledError:
             pass
 
-    async def heist_game(self, settings, server, t_heist, t_crew, t_vault):
+    async def heist_game(self, settings, server, t_heist, t_crew, t_vault, channel):
         crew = len(settings["Crew"])
         target = self.heist_target(settings, crew)
         settings["Config"]["Heist Start"] = True
         players = [server.get_member(x) for x in settings["Crew"]]
         results = self.game_outcomes(settings, players, target)
         start_output = self.message_handler(settings, crew, players)
+
+        # Mute channel
+        overwrites = channel.overwrites_for(server.default_role)
+        overwrites.send_messages = False
+        await self.bot.edit_channel_permissions(channel, server.default_role, overwrites)
+
         await self.bot.say("Get ready! The {} is starting with {}\nThe {} has decided to "
                            "hit **{}**.".format(t_heist, start_output, t_crew, target))
         await asyncio.sleep(3)
         await self.show_results(settings, results)
         if settings["Crew"]:
             players = [server.get_member(x) for x in settings["Crew"]]
-            data = self.calculate_credits(settings, players, target)
+            survivingplayers = [server.get_member(x) for x in settings["SurvivingCrew"]]
+            data = self.calculate_credits(settings, players, survivingplayers, target)
             headers = ["Players", "Credits Obtained", "Bonuses", "Total"]
             t = tabulate(data, headers=headers)
             msg = ("The credits collected from the {} was split among the winners:\n```"
                    "C\n{}```".format(t_vault, t))
         else:
             msg = "No one made it out safe."
+
+        # Un-Mute channel
+        overwrites = channel.overwrites_for(server.default_role)
+        overwrites.send_messages = True
+        await self.bot.edit_channel_permissions(channel, server.default_role, overwrites)
+
         settings["Config"]["Alert Time"] = int(time.perf_counter())
         self.reset_heist(settings)
         self.save_system()
@@ -764,16 +780,26 @@ class Heist:
         else:
             return "Some keys were missing in your theme. Please check your txt file."
 
-    def calculate_credits(self, settings, players, target):
+    def calculate_credits(self, settings, players, survivingplayers, target):
         names = [player.name for player in players]
-        bonuses = [subdict["Bonus"] for subdict in settings["Crew"].values()]
+        survivingnames = [player.name for player in survivingplayers]
+        bonuses = [subdict["Bonus"] for subdict in settings["Crew"].values()] + [0] * len(survivingnames)
         vault = settings["Targets"][target]["Vault"]
-        credits_stolen = int(int(vault) * 0.75 / len(settings["Crew"]))
-        stolen_data = [credits_stolen] * len(settings["Crew"])
+        credits_stolen = int(int(vault) * 0.75 / (len(settings["Crew"]) + len(settings["SurvivingCrew"])))
+        stolen_data = [credits_stolen] * (len(settings["Crew"]) + len(settings["SurvivingCrew"]))
+
+        # Combine successful players loot
+        for i in range(len(names)):
+            bonuses[len(names)+survivingnames.index(names[i])] += bonuses[i]
+            stolen_data[len(names)+survivingnames.index(names[i])] += stolen_data[i]
+
+        bonuses = bonuses[len(names):]
+        stolen_data = stolen_data[len(names):]
+
         total_winnings = [x + y for x, y in zip(stolen_data, bonuses)]
         settings["Targets"][target]["Vault"] -= credits_stolen * len(settings["Crew"])
-        credit_data = list(zip(names, stolen_data, bonuses, total_winnings))
-        deposits = list(zip(players, total_winnings))
+        credit_data = list(zip(survivingnames, stolen_data, bonuses, total_winnings))
+        deposits = list(zip(survivingplayers, total_winnings))
         self.award_credits(deposits)
         return credit_data
 
@@ -804,6 +830,7 @@ class Heist:
                 good_thing = random.choice(good_out)
                 good_out.remove(good_thing)
                 settings["Crew"][player.id] = {"Name": player.name, "Bonus": good_thing[1]}
+                settings["SurvivingCrew"][player.id] = {"Name": player.name, "Bonus": good_thing[1]}
                 settings["Players"][player.id]["Spree"] += 1
                 results.append(good_thing[0].format(player.name))
             else:
@@ -811,6 +838,9 @@ class Heist:
                 dropout_msg = bad_thing[0] + "```\n{0} dropped out of the game.```"
                 self.failure_handler(settings, player, bad_thing[1])
                 settings["Crew"].pop(player.id)
+                settings["SurvivingCrew"][player.id] = {"Name": player.name, "Bonus": 0}
+                if bad_thing[1] == "Dead":
+                    settings["SurvivingCrew"].pop(player.id)
                 bad_out.remove(bad_thing)
                 results.append(dropout_msg.format(player.name))
         self.save_system()
@@ -897,6 +927,7 @@ class Heist:
 
     def reset_heist(self, settings):
         settings["Crew"] = {}
+        settings["SurvivingCrew"] = {}
         settings["Config"]["Heist Planned"] = False
         settings["Config"]["Heist Start"] = False
         self.save_system()
