@@ -1,0 +1,45 @@
+Jail = resting
+OOB = running on gems
+Police = Enemy CC Troops
+Bail = heal
+Crew = clan
+Sentence = nap
+Heist = raid
+Vault = village
+
+|Good| "{} brought a few healers to keep themself alive. +25 credits", 25
+|Good| "{} brought a rage potion to the raid. +25 credits", 25
+|Good| "{} remembered to request CC troops before attacking. +25 credits", 25
+|Good| "{} used the hero abilities. +25 credits", 25
+|Good| "{} took out a corner hut. +50 credits.", 50
+|Good| "{} boosted the training barracks. +50 credits", 50
+|Good| "{} lured defending CC troops. +50 credits", +50
+|Good| "{} built a funnel correctly. +100 credits", 100
+|Good| "{} used a power potion on the clan. +100 credits", 100
+|Good| "{} dropped a heal on a known Giant Bomb location. +100 credits", 100
+|Good| "{} successfully scouted the top base. +100 credits", 100
+|Good| "{} managed to take out the Town Hall. +150 credits", 150
+|Good| "{} got every last drop of DE. +250 credits", 250
+|Good| "{} scored a six pack. +1,000 credits", 1000
+
+|Bad| "{0} stepped onto a spring trap.", "Apprehended"
+|Bad| "{0} forgot to bring heroes to the raid.", "Apprehended"
+|Bad| "{0} forgot to bring CC troops to the raid.", "Apprehended"
+|Bad| "{0} lost connection!", "Apprehended"
+|Bad| "{0} got stuck in the clouds.", "Apprehended"
+|Bad| "{0} stayed behind to finish taking out a wall.", "Apprehended"
+|Bad| "{0} was paralyzed by a hidden tesla.", "Apprehended"
+|Bad| "{0} dropped a freeze spell on themself.", "Apprehended"
+|Bad| "{0} forgot to attack.", "Apprehended"
+|Bad| "{0} managed to get 0 stars.", "Apprehended"
+|Bad| "{0} decided to heal the grass.", "Apprehended"
+|Bad| "{0} dropped their spells instead of troops and rage quit.", "Apprehended"
+|Bad| "{0} decided to chase around a butterfly.", "Apprehended"
+|Bad| "{0} got lost in a Miner tunnel.", "Apprehended"
+|Bad| "{0} left warden in air mode.", "Apprehended"
+|Bad| "{0} was blown off the map by an air sweeper.", "Apprehended"
+|Bad| "{0} forgot funnel and was singled out by an archer tower. (death)", "Dead"
+|Bad| "{0} walked into double giant bombs. (death)", "Dead"
+|Bad| "{0} was burnt to a crisp by a single target Inferno Tower. (death)", "Dead"
+|Bad| "{0} got killed by the CC troops. (death)", "Dead"
+|Bad| "{0} accidentally drank a poison spell. (death)", "Dead"
