@@ -405,7 +405,7 @@ class Race:
         for n in range(0, len(data['Players'])):
             await self.bot.add_reaction(bet_msg, str(n) + '\u20e3')
 
-        await asyncio.sleep(10)
+        await asyncio.sleep(30)
 
         user_bets = {}
         
@@ -415,7 +415,10 @@ class Race:
                 member = author.server.get_member(user.id)
                 if member is not None and member != self.bot.user:
                     if user.id not in user_bets:
-                        user_bets[user.id] = int(reaction.emoji.replace('\u20e3', ''))
+                        try:
+                            user_bets[user.id] = int(reaction.emoji.replace('\u20e3', ''))
+                        except:
+                            pass
 
         await self.bot.delete_message(bet_msg)
 
