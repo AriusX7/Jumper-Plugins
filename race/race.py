@@ -249,7 +249,8 @@ class Race:
         """Set the prize range
 
         A number of credits will be randomly picked from the set
-        miminum to the set maximum.
+        miminum to the set maximum. The prize will also be multiplied
+        by the number of entries in the race.
 
         Parameters:
             minimum: integer
@@ -440,7 +441,7 @@ class Race:
 
         bank = self.bot.get_cog('Economy').bank
         prize_range = settings['Prize']
-        prize = random.randint(*prize_range)
+        prize = random.randint(*prize_range) * len(data['Players'])
 
         winning_index = list(data['Players']).index(data['Winner'].id)
 
