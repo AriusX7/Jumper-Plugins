@@ -124,6 +124,8 @@ class Racer:
         self.user = user
         self.turn = 0
         self.position = 80
+        self.last_position = 80
+        self.last_move = 0
         self.placed = False
         self.current = Racer.track + self.animal
 
@@ -139,12 +141,16 @@ class Racer:
 
     def update_track(self):
         distance = self.move()
+        if (self.position != 0):
+            self.last_move = distance
         self.current = (Racer.track[:max(0, self.position - distance)] + self.animal +
                         Racer.track[max(0, self.position - distance):])
 
     def update_position(self):
         self.turn = self.turn + 1
         self.update_track()
+        if self.position != 0:
+            self.last_position = self.position
         self.position = self.get_position()
 
     def move(self):
@@ -447,7 +453,7 @@ class Race:
                     await self.bot.say("Error depositing bet winnings in {}'s bank account.".format(member.nick or member.name))
                     print("Erro {}".format(err))
         if not one_winner:
-            bet_earnings += '\nNo guess the winner.'
+            bet_earnings += '\nNo one guessed the winner.'
 
         # footer = "Type {}race claim to receive prize money. You must claim it before the next race!"
         first = ':first_place:  {0}'.format(data['First'][0].nick or data['First'][0].name)
@@ -658,36 +664,30 @@ class Race:
         return racers
 
     async def run_game(self, racers, game, data):
+        finished_racers = []
         while True:
             await asyncio.sleep(2.0)
             for player in racers:
                 player.update_position()
                 position = player.get_position()
                 if position == 0:
-                    if not data['Winner']:
-                        speed = player.turn + random.uniform(0.1, 0.88)
-                        data['Winner'] = player.user
-                        data['First'] = (player.user, player.animal, speed)
+                    if not player.placed:
+                        player.speed = player.turn + player.last_move / player.last_position
                         player.placed = True
-                    elif not data['Second'] and not player.placed:
-                        if data['First'][2] > player.turn:
-                            speed = player.turn + random.uniform(0.89, 0.99)
-                        else:
-                            speed = player.turn + random.uniform(0.1, 0.88)
-                        data['Second'] = (player.user, player.animal, speed)
-                        player.placed = True
-                    elif not data['Third'] and not player.placed:
-                        if data['Second'][2] > player.turn:
-                            speed = player.turn + random.uniform(0.89, 0.99)
-                        else:
-                            speed = player.turn + random.uniform(0.1, 0.88)
-                        data['Third'] = (player.user, player.animal, speed)
-                        player.placed = True
+                        finished_racers.append(player)
+
             field = [player.field(data['Mode']) for player in racers]
             await self.bot.edit_message(game, '\n'.join(field))
 
             if [player.get_position() for player in racers].count(0) == len(racers):
                 break
+        
+        finished_racers = sorted(finished_racers, key=lambda x: x.speed)
+        data['Winner'] = finished_racers[0].user
+        data['First'] = (finished_racers[0].user, finished_racers[0].animal, finished_racers[0].speed)
+        data['Second'] = (finished_racers[1].user, finished_racers[1].animal, finished_racers[1].speed)
+        if len(finished_racers) > 2:
+            data['Third'] = (finished_racers[2].user, finished_racers[2].animal, finished_racers[2].speed)
 
         prize = random.randint(10, 100)
         data['Prize'] = prize
