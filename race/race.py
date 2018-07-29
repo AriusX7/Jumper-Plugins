@@ -164,7 +164,10 @@ class Racer:
             return random.randint(0, 7) * 2
 
         elif self.mode == 'steady':
-            return 2 * 3
+            if self.turn % 5 == 0:
+                return random.randint(5, 7)
+            else:
+                return 2 * 3
 
         elif self.mode == 'abberant':
             if random.randint(1, 100) >= 90:
