@@ -675,7 +675,7 @@ class Race:
                 position = player.get_position()
                 if position == 0:
                     if not player.placed:
-                        player.speed = player.turn + player.last_move / player.last_position
+                        player.speed = player.turn + player.last_position / player.last_move
                         player.placed = True
                         finished_racers.append(player)
 
