@@ -393,7 +393,7 @@ class Race:
         await self.bot.edit_channel_permissions(channel, server.default_role, overwrites)
 
         # Race Betting
-        bet_text = '**Race is about to start taking bets**\n*You can only bet on a single person.\nIf you react to more than one number it will accept the lowest number you reacted with.\nIf you bet and do not have a bank account you will receive no reward.*\n```'
+        bet_text = '**Race is about to start, now taking bets**\n*You can only bet on a single person.\nIf you react to more than one number it will accept the lowest number you reacted with.\nIf you bet and do not have a bank account you will receive no reward.*\n```'
         count = 0
         for user in data['Players']:
             bet_racer = author.server.get_member(user)
