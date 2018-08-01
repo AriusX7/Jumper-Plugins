@@ -6,6 +6,7 @@ import asyncio
 import random
 import os
 import time
+import re
 
 # Discord and Red Utils
 import discord
@@ -102,6 +103,11 @@ clash_characters = (
     ('<:boxergiant:316393732645584898>', 'slow'), # 150
 )
 
+
+def escape_message(message):
+    return re.sub(r'([`~*_])', r'\\\1', message)
+
+
 class PluralDict(dict):
     def __missing__(self, key):
         if '(' in key and key.endswith(')'):
@@ -131,9 +137,9 @@ class Racer:
 
     def field(self, mode):
         if mode == 'clashofclans':
-            field = "<:gems:316692795035484163> **{}** :flag_black:  [{}]".format(self.current, self.user.nick or self.user.name)
+            field = "<:gems:316692795035484163> **{}** :flag_black:  [{}]".format(self.current, escape_message(self.user.nick or self.user.name))
         else:
-            field = ":carrot: **{}** :flag_black:  [{}]".format(self.current, self.user.nick or self.user.name)
+            field = ":carrot: **{}** :flag_black:  [{}]".format(self.current, escape_message(self.user.nick or self.user.name))
         return field
 
     def get_position(self):
@@ -290,7 +296,7 @@ class Race:
         author = ctx.message.author
         if time < 0:
             return await self.bot.say("{}. You are a dumbass. I can't turn back"
-                                      "time.".format(author.nick or author.name))
+                                      "time.".format(escape_message(author.nick or author.name)))
 
         settings = self.check_config(author.server)
         settings['Time'] = time
@@ -401,7 +407,7 @@ class Race:
         count = 0
         for user in data['Players']:
             bet_racer = author.server.get_member(user)
-            bet_text += ("\n[{0}] {1}".format(count, bet_racer.nick or bet_racer.name))
+            bet_text += ("\n[{0}] {1}".format(count, escape_message(bet_racer.nick or bet_racer.name)))
             count += 1
         bet_text += '\n```'
 
@@ -454,23 +460,23 @@ class Race:
                 try:
                     if bank.account_exists(member):
                         bank.deposit_credits(member, 100 * len(data['Players']))
-                        bet_earnings += '\n{}'.format(member.nick or member.name)
+                        bet_earnings += '\n{}'.format(escape_message(member.nick or member.name))
                         one_winner = True
                 except Exception as err:
-                    await self.bot.say("Error depositing bet winnings in {}'s bank account.".format(member.nick or member.name))
+                    await self.bot.say("Error depositing bet winnings in {}'s bank account.".format(escape_message(member.nick or member.name)))
                     print("Erro {}".format(err))
         if not one_winner:
             bet_earnings += '\nNo one guessed the winner.'
 
         # footer = "Type {}race claim to receive prize money. You must claim it before the next race!"
-        first = ':first_place:  {0}'.format(data['First'][0].nick or data['First'][0].name)
+        first = ':first_place:  {0}'.format(escape_message(data['First'][0].nick or data['First'][0].name))
         fv = '{1}\n{2:.2f}s'.format(*data['First'])
         fv = fv + '\nPrize: {0}'.format(prize)
-        second = ':second_place: {0}'.format(data['Second'][0].nick or data['Second'][0].name)
+        second = ':second_place: {0}'.format(escape_message(data['Second'][0].nick or data['Second'][0].name))
         sv = '{1}\n{2:.2f}s'.format(*data['Second'])
         sv = sv + '\nPrize: {0}'.format(int(prize*0.75))
         if data['Third']:
-            third = ':third_place:  {0}'.format(data['Third'][0].nick or data['Third'][0].name)
+            third = ':third_place:  {0}'.format(escape_message(data['Third'][0].nick or data['Third'][0].name))
             tv = '{1}\n{2:.2f}s'.format(*data['Third'])
             tv = tv + '\nPrize: {0}'.format(int(prize*0.5))
         else:
@@ -532,7 +538,7 @@ class Race:
 
         bank = self.bot.get_cog('Economy').bank
         if not bank.account_exists(author):
-            await self.bot.say("{} you need to register a bank account before racing.".format(author.nick or author.name))
+            await self.bot.say("{} you need to register a bank account before racing.".format(escape_message(author.nick or author.name)))
             return
 
         await self._start_race(ctx)
@@ -546,11 +552,11 @@ class Race:
         elif author.id in data['Players']:
             return
         elif len(data['Players']) >= 10:
-            await self.bot.say("**{}** sorry the race is full!".format(author.nick or author.name))
+            await self.bot.say("**{}** sorry the race is full!".format(escape_message(author.nick or author.name)))
             return
         else:
             data['Players'][author.id] = {}
-            await self.bot.say("**{}** entered the race!".format(author.nick or author.name))
+            await self.bot.say("**{}** entered the race!".format(escape_message(author.nick or author.name)))
 
     # @race.command(name="claim", pass_context=True)
     async def _claim_race(self, ctx):
@@ -589,7 +595,7 @@ class Race:
         try:  # Because people will play games for money without a fucking account smh
             bank.deposit_credits(author, prize)
         except Exception as e:
-            print('{} raised {} because they are stupid.'.format(author.nick or author.name, type(e)))
+            print('{} raised {} because they are stupid.'.format(escape_message(author.nick or author.name), type(e)))
             await self.bot.say("We wanted to give you a prize, but you didn't have a bank "
                                "account.\nTo teach you a lesson, your winnings are mine this "
                                "time. Now go register!")
