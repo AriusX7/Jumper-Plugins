@@ -420,7 +420,7 @@ class Race(commands.Cog):
         if third:
             embed.add_field(name=f'{third[0].name} 🥉', value=third[1].emoji)
         embed.add_field(name="Payouts", value=payout_msg)
-        embed.set_footer(text="Bet winners: {footer}")
+        embed.set_footer(text=f"Bet winners: {footer}")
         return embed
 
     def _payout_msg(self, settings, currency):
