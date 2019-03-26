@@ -469,7 +469,7 @@ class Race(commands.Cog):
 
     async def run_game(self, ctx):
         players = await self._game_setup(ctx)
-        setup = "\u200b\n" + '\n'.join(f":carrot: **{clones.current}** 🏁"  
+        setup = "\u200b\n" + '\n'.join(f"<:bb_gem:560226360727961620> **{clones.current}** 🏁"  
                                        f"[{jockey.name}]" for clones, jockey in players)
         track = await ctx.send(setup)
         counter = 0
@@ -479,10 +479,10 @@ class Race(commands.Cog):
             fields = []
             for clones, jockey in players:
                 if clones.position == 0:
-                    fields.append(f":carrot: **{clones.current}** 🏁  [{jockey.name}]")
+                    fields.append(f"<:bb_gem:560226360727961620> **{clones.current}** 🏁  [{jockey.name}]")
                     continue
                 clones.move()
-                fields.append(f":carrot: **{clones.current}** 🏁  [{jockey.name}]")
+                fields.append(f"<:bb_gem:560226360727961620> **{clones.current}** 🏁  [{jockey.name}]")
                 if clones.position == 0 and len(self.winners) < 3:
                     self.winners.append((jockey, clones))
             t = "\u200b\n" + "\n".join(fields)
