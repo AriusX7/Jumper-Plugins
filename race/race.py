@@ -1,727 +1,493 @@
 # Developed by Redjumpman for Redbot.
-# Inspired by the snail race mini game
+# Inspired by the snail race mini game.
 
-# STD Library
+# Standard Library
 import asyncio
 import random
-import os
-import time
-import re
 
-# Discord and Red Utils
+# Red
+from redbot.core import Config, bank, commands, checks
+
+# Discord
 import discord
-from discord.ext import commands
-from __main__ import send_cmd_help
-from .utils import checks
-from .utils.dataIO import dataIO
 
-animals = (
-    # Fast
-    (':rabbit2:', 'fast'),
-    (':monkey:', 'fast'),
-    (':cat2:', 'fast'),
-    (':chipmunk:', 'fast'),
-    (':rat:', 'fast'),
-    (':dove:', 'fast'),
-    (':bird:', 'fast'),
-    # Steady
-    (':dromedary_camel:', 'steady'),
-    (':camel:', 'steady'),
-    (':dog2:', 'steady'),
-    (':poodle:', 'steady'),
-    (':racehorse:', 'steady'),
-    # Abberant
-    (':ox:', 'abberant'),
-    (':cow2:', 'abberant'),
-    (':elephant:', 'abberant'),
-    (':water_buffalo:', 'abberant'),
-    (':ram:', 'abberant'),
-    (':goat:', 'abberant'),
-    (':sheep:', 'abberant'),
-    # Predator
-    (':leopard:', 'predator'),
-    (':tiger2:', 'predator'),
-    # Special
-    (':dragon:', 'special'),
-    (':unicorn:', 'special'),
-    # Slow
-    (':mouse2:', 'slow'),
-    (':turtle:', 'slow'),
-    (':bug:', 'slow'),
-    (':rooster:', 'slow'),
-    (':snail:', 'slow'),
-    (':scorpion:', 'slow'),
-    (':crocodile:', 'slow'),
-    (':pig2:', 'slow'),
-    (':turkey:', 'slow'),
-    (':duck:', 'slow'),
-    (':baby_chick:', 'slow')
-)
+# Race
+from .clones import Clones, racers
 
-clash_characters = (
-    # Very Fast
-    ('<:minion:316393733497290762>', 'veryfast'), # 400
-    ('<:miner:316393733216272384>', 'veryfast'), # 400
-    ('<:goblin:316393733493096448>', 'veryfast'), # 400
-    ('<:betaminion:316393733211947008>', 'veryfast'), # 400
-    # Fast
-    ('<:wallbreaker:316393733501485056>', 'fast'), # 300
-    ('<:valkyrie:316393733576720394>', 'fast'), # 300
-    ('<:sneakyarcher:316393733421793280>', 'fast'), # 300
-    ('<:hogrider:316393732641390604>', 'fast'), # 300
-    ('<:archerqueen:316393777075978251>', 'fast'), # 300
-    ('<:archer:316393729542062081>', 'fast'), # 300
-    # Steady
-    ('<:barbarian:316393732671012864>', 'steady'), # 200
-    ('<:cannoncart:316393732825939969>', 'steady'), # 200
-    ('<:healer:316393732947705867>', 'steady'), # 200
-    ('<:wizard:316393732955963393>', 'steady'), # 200
-    ('<:barbarianking:316393776765468674>', 'steady'), # 200
-    ('<:grandwarden:316393831660781569>', 'steady'), # 200
-    ('<:warmachine:316393831820165122>', 'steady'), # 200
-    # Abberant
-    ('<:bomber:316393732767481868>', 'abberant'), # 200
-    ('<:dropship:316393733207621634>', 'abberant'), # 150
-    ('<:ballooncoc:316393733417467904>', 'abberant'), # 130
-    # Predator
-    ('<:electrodragon:471407003969781780>', 'predator'), # 150
-    ('<:dragoncoc:316393733216272386>', 'predator'), # 200
-    ('<:battleblimp:471407003961524224>', 'predator'), # 225
-    ('<:lavahound:316393733539102720>', 'predator'), # 250
-    ('<:babydragon:316393730016018442>', 'predator'), # 250
-    # Special
-    ('<:ragedbarbarian:316393733245632522>', 'special'), # 200
-    # Slow
-    ('<:superpekka:316393733488771072>', 'slow'), # 200
-    ('<:pekka:316393733518000128>', 'slow'), # 200
-    ('<:bowler:316393732620419083>', 'slow'), # 175
-    ('<:witch:316393733224660995>', 'slow'), # 150
-    ('<:wallwrecker:471407005257564181>', 'slow'), # 150
-    ('<:nightwitch:316393733409079306>', 'slow'), # 150
-    ('<:golem:316393733308416011>', 'slow'), # 150
-    ('<:giant:316393733501222923>', 'slow'), # 150
-    ('<:boxergiant:316393732645584898>', 'slow'), # 150
-)
+__author__ = "Redjumpman"
+__version__ = "2.0.12"
+
+guild_defaults = {"Wait": 60,
+                  "Mode": "normal",
+                  "Prize": 100,
+                  "Pooling": False,
+                  "Payout_Min": 0,
+                  "Bet_Multiplier": 2,
+                  "Bet_Min": 10,
+                  "Bet_Max": 50,
+                  "Bet_Allowed": True,
+                  "Games_Played": 0}
+
+# First, Second, and Third place wins
+member_defaults = {"Wins": {"1": 0, "2": 0, "3": 0}, "Losses": 0}
 
 
-def escape_message(message):
-    return re.sub(r'([`~*_])', r'\\\1', message)
+class Race(commands.Cog):
+    """Cog for racing Clones"""
 
+    def __init__(self):
+        self.db = Config.get_conf(self, 5074395009, force_registration=True)
+        self.db.register_guild(**guild_defaults)
+        self.db.register_member(**member_defaults)
+        self.active = False
+        self.started = False
+        self.winners = []
+        self.players = []
+        self.bets = {}
 
-class PluralDict(dict):
-    def __missing__(self, key):
-        if '(' in key and key.endswith(')'):
-            key, rest = key.split('(', 1)
-            value = super().__getitem__(key)
-            suffix = rest.rstrip(')').split(',')
-            if len(suffix) == 1:
-                suffix.insert(0, '')
-            return suffix[0] if value <= 1 else suffix[1]
-        raise KeyError(key)
-
-
-class Racer:
-
-    track = '•   ' * 20
-
-    def __init__(self, animal, mode, user):
-        self.animal = animal
-        self.mode = mode
-        self.user = user
-        self.turn = 0
-        self.position = 80
-        self.last_position = 80
-        self.last_move = 0
-        self.placed = False
-        self.current = Racer.track + self.animal
-
-    def field(self, mode):
-        if mode == 'clashofclans':
-            field = "<:gems:316692795035484163> **{}** :flag_black:  [{}]".format(self.current, escape_message(self.user.nick or self.user.name))
-        else:
-            field = ":carrot: **{}** :flag_black:  [{}]".format(self.current, escape_message(self.user.nick or self.user.name))
-        return field
-
-    def get_position(self):
-        return self.current.find(self.animal)
-
-    def update_track(self):
-        distance = self.move()
-        if (self.position != 0):
-            self.last_move = distance
-        self.current = (Racer.track[:max(0, self.position - distance)] + self.animal +
-                        Racer.track[max(0, self.position - distance):])
-
-    def update_position(self):
-        self.turn = self.turn + 1
-        self.update_track()
-        if self.position != 0:
-            self.last_position = self.position
-        self.position = self.get_position()
-
-    def move(self):
-        if self.mode == 'slow':
-            return random.randint(1, 3) * 3
-
-        elif self.mode == 'fast':
-            return random.randint(0, 4) * 3
-
-        elif self.mode == 'veryfast':
-            return random.randint(0, 7) * 2
-
-        elif self.mode == 'steady':
-            if self.turn % 5 == 0:
-                return random.randint(5, 7)
-            else:
-                return 2 * 3
-
-        elif self.mode == 'abberant':
-            if random.randint(1, 100) >= 90:
-                return 5 * 3
-            else:
-                return random.randint(0, 2) * 3
-
-        elif self.mode == 'predator':
-            if self.turn % 2 == 0:
-                return 0
-            else:
-                return random.randint(2, 5) * 3
-
-        elif self.animal == ':unicorn:':
-            if self.turn % 3:
-                return random.choice([len('blue'), len('red'), len('green')]) * 3
-            else:
-                return 0
-        else:
-            if self.turn == 1:
-                return 14 * 3
-            elif self.turn == 2:
-                return 0
-            else:
-                return random.randint(0, 2) * 3
-
-
-class Race:
-    """Cog for racing animals"""
-
-    def __init__(self, bot):
-        self.bot = bot
-        self.system = {}
-        self.config = dataIO.load_json('data/race/race.json')
-        self.version = "1.2.0"
-        self.race_time = -120
-        
-    def time_format(self, seconds):
-        m, s = divmod(seconds, 60)
-        h, m = divmod(m, 60)
-        data = PluralDict({'hour': h, 'minute': m, 'second': s})
-        if h > 0:
-            fmt = "{hour} hour{hour(s)}"
-            if data["minute"] > 0 and data["second"] > 0:
-                fmt += ", {minute} minute{minute(s)}, and {second} second{second(s)}"
-            if data["second"] > 0 == data["minute"]:
-                fmt += ", and {second} second{second(s)}"
-            msg = fmt.format_map(data)
-        elif h == 0 and m > 0:
-            if data["second"] == 0:
-                fmt = "{minute} minute{minute(s)}"
-            else:
-                fmt = "{minute} minute{minute(s)}, and {second} second{second(s)}"
-            msg = fmt.format_map(data)
-        elif m == 0 and h == 0 and s > 0:
-            fmt = "{second} second{second(s)}"
-            msg = fmt.format_map(data)
-        else:
-            msg = "No Cooldown"
-        return msg
-
-    @commands.group(pass_context=True, no_pm=True)
+    @commands.group()
+    @commands.guild_only()
     async def race(self, ctx):
-        """Race cog's group command"""
+        """Race related commands."""
+        pass
 
-        if ctx.invoked_subcommand is None:
-            await send_cmd_help(ctx)
+    @race.command()
+    async def start(self, ctx):
+        """Begins a new race.
 
-    @commands.group(pass_context=True, no_pm=True)
-    async def setrace(self, ctx):
-        """Race cog's settings group command"""
+        You cannot start a new race until the active on has ended.
 
-        if ctx.invoked_subcommand is None:
-            await send_cmd_help(ctx)
+        If you are the only player in the race, you will race against
+        your bot.
 
-    @setrace.command(name="prize", pass_context=True)
-    @checks.admin_or_permissions(manage_server=True)
-    async def _prize_setrace(self, ctx, minimum: int, maximum: int):
-        """Set the prize range
-
-        A number of credits will be randomly picked from the set
-        miminum to the set maximum. The prize will also be multiplied
-        by the number of entries in the race.
-
-        Parameters:
-            minimum: integer
-                Must be lower than maximum
-            maximum: integer
-                Must be higher than minimum
-
-        Returns:
-            Bot replies with invalid mode
-            Bot replies with valid mode and saves choice
+        The user who started the race is automatically entered into the race.
         """
-
-        if minimum > maximum:
-            return await self.bot.say("https://simple.wikipedia.org/wiki/Maximum_and_minimum")
-        server = ctx.message.server
-        settings = self.check_config(server)
-        settings['Prize'] = (minimum, maximum)
-        self.save_settings()
-        await self.bot.say("Prize range set to {}-{}".format(minimum, maximum))
-
-    @setrace.command(name="time", pass_context=True)
-    @checks.admin_or_permissions(manage_server=True)
-    async def _time_setrace(self, ctx, time: int):
-        """Set the time players have to enter a race
-
-        Amount of time for the bot to wait for entrants until the race
-        is ready to begin.
-
-        Parameters:
-            time: integer
-                Unit is expressed in seconds
-                Default is set to 60 seconds
-
-        Returns:
-            Bo
-        """
-        author = ctx.message.author
-        if time < 0:
-            return await self.bot.say("{}. You are a dumbass. I can't turn back"
-                                      "time.".format(escape_message(author.nick or author.name)))
-
-        settings = self.check_config(author.server)
-        settings['Time'] = time
-        self.save_settings()
-        await self.bot.say("Wait time set to {}s".format(time))
-
-    @setrace.command(name="mode", pass_context=True)
-    @checks.admin_or_permissions(manage_server=True)
-    async def _mode_setrace(self, ctx, mode: str):
-        """Set the race mode
-
-        Standard Mode assigns everyone a turtle. Everyone has the same
-        random movement formula.
-
-        Zoo Mode assigns every entrant a random animal. Animals are grouped into
-        classes that meet a special formula for movement. 8 different animal classes!
-
-        ClashofClans Mode assigns every entrant a random clash character.
-
-        Parameters:
-            mode: string
-                Must be standard or zoo
-        Returns:
-            Bot replies with invalid mode
-            Bot replies with valid mode and saves choice
-        """
-        server = ctx.message.server
-        settings = self.check_config(server)
-        mode = mode.lower()
-        modes = ['standard', 'zoo', 'clashofclans']
-        if mode not in modes:
-            return await self.bot.say("Invalid mode. Acceptable responses "
-                                      "include: {}.".format(', '.join(modes)))
-        settings['Mode'] = mode
-        self.save_settings()
-        await self.bot.say("Mode now set to {}.".format(mode))
-
-    @race.command(name="version")
-    async def _version_race(self):
-        """Displays the version of race"""
-        await self.bot.say("You are running race version {}".format(self.version))
-
-    @race.command(name="reset", pass_context=True, hidden=True)
-    @checks.admin_or_permissions(manage_server=True)
-    async def _reset_race(self, ctx):
-        """Reset race parameters DEBUG USE ONLY"""
-        server = ctx.message.server
-        data = self.check_server(server)
-        self.game_teardown(data, force=True)
-        await self.bot.say("Parameters reset.")
-
-    # @race.command(name="start", pass_context=True)
-    # @commands.cooldown(1, 120, commands.BucketType.server)
-    async def _start_race(self, ctx):
-        """Start an animal race and enter yourself as participant
-
-            Returns:
-                Two text outputs. One to start the race,
-                and the second to represent the race. The second
-                msg will be edited multiple times to represent the race.
-
-            Notes:
-                Must wait 2 minutes after every race to start a new one.
-                You cannot start a race if a race is already active.
-                A race is considered active once this command is used.
-                A race is considered started once the track is displayed.
-                The user who starts a race, will be automatically entered.
-                The bot will always join a race.
-                There are no cheaters and it isn't rigged.
-        """
-        author = ctx.message.author
-        data = self.check_server(author.server)
-        settings = self.check_config(author.server)
-
-        if data['Race Active']:
+        if self.active:
             return
-        elif abs(self.race_time - int(time.perf_counter())) < 120:
-            time_fmt = self.time_format(abs(120 - abs(self.race_time - int(time.perf_counter()))))
-            await self.bot.say("The racers are resting. Try again in {}!".format(time_fmt))
-            return
-
-        self.game_teardown(data, force=True)
-        data['Race Active'] = True
-        data['Players'][author.id] = {}
-        wait = settings['Time']
-        await self.bot.say(":triangular_flag_on_post: A race has begun! Type {}race enter "
-                           "to join the race! :triangular_flag_on_post:\n{}The race will "
-                           "begin in {} seconds!\n\n**{}** entered the "
-                           "race!".format(ctx.prefix, ' ' * 25, wait, author.mention))
+        self.active = True
+        self.players.append(ctx.author)
+        wait = await self.db.guild(ctx.guild).Wait()
+        current = await self.db.guild(ctx.guild).Games_Played()
+        await self.db.guild(ctx.guild).Games_Played.set(current + 1)
+        await ctx.send(f"🚩 A race has begun! Type {ctx.prefix}race enter "
+                       f"to join the race! 🚩\nThe race will begin in "
+                       f"{wait} seconds!\n\n**{ctx.author.mention}** entered the race!")
         await asyncio.sleep(wait)
-        
-        channel = ctx.message.channel
-        server = ctx.message.server
-        if len(data['Players']) == 1:
-            server = ctx.message.server
-            data = self.check_server(server)
-            self.game_teardown(data, force=True)
-            await self.bot.say("There are not enough racers to start the race.")
-            return
+        self.started = True
+        await ctx.send("🏁 The race is now in progress. 🏁")
+        await self.run_game(ctx)
 
-        # Mute channel
-        overwrites = channel.overwrites_for(server.default_role)
-        overwrites.send_messages = False
-        await self.bot.edit_channel_permissions(channel, server.default_role, overwrites)
+        settings = await self.db.guild(ctx.guild).all()
+        currency = await bank.get_currency_name(ctx.guild)
+        color = await ctx.embed_colour()
+        msg, embed = self._build_end_screen(settings, currency, color)
+        await ctx.send(content=msg, embed=embed)
+        await self._race_teardown(settings)
 
-        # Race Betting
-        bet_text = '**Race is about to start, now taking bets**\n*You can only bet on a single person.\nIf you react to more than one number it will accept the lowest number you reacted with.\nIf you bet and do not have a bank account you will receive no reward.*\n```'
-        count = 0
-        for user in data['Players']:
-            bet_racer = author.server.get_member(user)
-            bet_text += ("\n[{0}] {1}".format(count, escape_message(bet_racer.nick or bet_racer.name)))
-            count += 1
-        bet_text += '\n```'
-
-        bet_msg = await self.bot.say(bet_text)
-        for n in range(0, len(data['Players'])):
-            await self.bot.add_reaction(bet_msg, str(n) + '\u20e3')
-
-        await asyncio.sleep(30)
-
-        user_bets = {}
-        
-        bet_msg = await self.bot.get_message(channel, bet_msg.id)
-        for reaction in bet_msg.reactions:
-            for user in await self.bot.get_reaction_users(reaction):
-                member = author.server.get_member(user.id)
-                if member is not None and member != self.bot.user:
-                    if user.id not in user_bets:
-                        try:
-                            user_bets[user.id] = int(reaction.emoji.replace('\u20e3', ''))
-                        except:
-                            pass
-
-        await self.bot.delete_message(bet_msg)
-
-        await self.bot.say(":checkered_flag: The race is now in progress :checkered_flag:")
-
-        # Run Race
-        self.race_time = int(time.perf_counter())
-
-        data['Race Start'] = True
-        data['Mode'] = settings['Mode']
-
-        racers = self.game_setup(author, data, settings['Mode'])
-        race_msg = await self.bot.say('\n'.join([player.field(settings['Mode']) for player in racers]))
-
-        await self.run_game(racers, race_msg, data)
-
-        bank = self.bot.get_cog('Economy').bank
-        prize_range = settings['Prize']
-        prize = random.randint(*prize_range) * len(data['Players'])
-
-        winning_index = list(data['Players']).index(data['Winner'].id)
-
-        bet_earnings = ''
-        one_winner = False
-        for user_id in user_bets:
-            bet = user_bets[user_id]
-            if bet == winning_index:
-                member = server.get_member(user_id)
-                try:
-                    if bank.account_exists(member):
-                        bank.deposit_credits(member, 100 * len(data['Players']))
-                        bet_earnings += '\n{}'.format(escape_message(member.nick or member.name))
-                        one_winner = True
-                except Exception as err:
-                    await self.bot.say("Error depositing bet winnings in {}'s bank account.".format(escape_message(member.nick or member.name)))
-                    print("Erro {}".format(err))
-        if not one_winner:
-            bet_earnings += '\nNo one guessed the winner.'
-
-        # footer = "Type {}race claim to receive prize money. You must claim it before the next race!"
-        first = ':first_place:  {0}'.format(escape_message(data['First'][0].nick or data['First'][0].name))
-        fv = '{1}\n{2:.2f}s'.format(*data['First'])
-        fv = fv + '\nPrize: {0}'.format(prize)
-        second = ':second_place: {0}'.format(escape_message(data['Second'][0].nick or data['Second'][0].name))
-        sv = '{1}\n{2:.2f}s'.format(*data['Second'])
-        sv = sv + '\nPrize: {0}'.format(int(prize*0.75))
-        if data['Third']:
-            third = ':third_place:  {0}'.format(escape_message(data['Third'][0].nick or data['Third'][0].name))
-            tv = '{1}\n{2:.2f}s'.format(*data['Third'])
-            tv = tv + '\nPrize: {0}'.format(int(prize*0.5))
-        else:
-            third = ':third_place:'
-            tv = '--\n--'
-
-        embed = discord.Embed(colour=0x00CC33)
-        embed.add_field(name=first, value=fv)
-        embed.add_field(name=second, value=sv)
-        embed.add_field(name=third, value=tv)
-        embed.add_field(name='Bet earnings of {} credits:'.format(100 * len(data['Players'])), value=bet_earnings, inline=False)
-        # embed.add_field(name='-' * 99, value='{} is the winner!'.format(data['Winner']))
-        embed.title = "Race Results"
-        # embed.set_footer(text=footer.format(ctx.prefix))
-
+    @race.command()
+    async def stats(self, ctx, user: discord.Member = None):
+        """Display your race stats."""
+        if not user:
+            user = ctx.author
+        color = await ctx.embed_colour()
+        user_data = await self.db.member(user).all()
+        player_total = sum(user_data['Wins'].values()) + user_data["Losses"]
+        server_total = await self.db.guild(ctx.guild).Games_Played()
         try:
-            if bank.account_exists(data['First'][0]):
-                bank.deposit_credits(data['First'][0], prize)
-        except Exception as err:
-            await self.bot.say("Error depositing winnings in {}'s bank account.".format(data['First'][0]))
-            print("Erro {}".format(err))
+            percent = round((player_total / server_total) * 100, 1)
+        except ZeroDivisionError:
+            percent = 0
+        embed = discord.Embed(color=color, description='Race Stats')
+        embed.set_author(name=f'{user}', icon_url=user.avatar_url)
+        embed.add_field(name="Wins", value=(f"1st: {user_data['Wins']['1']}\n2nd: "
+                                            f"{user_data['Wins']['2']}\n"
+                                            f"3rd: {user_data['Wins']['3']}"))
+        embed.add_field(name="Losses", value=f'{user_data["Losses"]}')
+        embed.set_footer(text=(f'You have played in {player_total} ({percent}%) races out '
+                               f'of {server_total} total races on the server.'))
+        await ctx.send(embed=embed)
 
-        try:
-            if bank.account_exists(data['Second'][0]):
-                bank.deposit_credits(data['Second'][0], int(prize * 0.75))
-        except Exception as err:
-            await self.bot.say("Error depositing winnings in {}'s bank account.".format(data['Second'][0]))
-            print("Erro {}".format(err))
-        
-        try:
-            if data['Third'] and bank.account_exists(data['Third'][0]):
-                bank.deposit_credits(data['Third'][0], int(prize * 0.5))
-        except Exception as err:
-            await self.bot.say("Error depositing winnings in {}'s bank account.".format(data['Third'][0]))
-            print("Erro {}".format(err))
+    @race.command()
+    async def bet(self, ctx, bet: int, user: discord.Member):
+        """Bet on a user in the race."""
+        if await self.bet_conditions(ctx, bet, user):
+            self.bets[user] = {"Bets": [(ctx.author, bet)]}
+            currency = await bank.get_currency_name(ctx.guild)
+            await bank.withdraw_credits(ctx.author, bet)
+            await ctx.send(f"{ctx.author.mention} placed a {bet} {currency} bet on {str(user)}.")
 
-        await self.bot.say(embed=embed)
-        self.game_teardown(data)
-        
-        # Un-Mute channel
-        overwrites = channel.overwrites_for(server.default_role)
-        overwrites.send_messages = True
-        await self.bot.edit_channel_permissions(channel, server.default_role, overwrites)
+    @race.command()
+    async def enter(self, ctx):
+        """Allows you to enter the race.
 
-    @race.command(name="enter", pass_context=True)
-    async def _enter_race(self, ctx):
-        """Enter an animal race
+        This command will return silently if a race has already started.
+        By not repeatedly telling the user that they can't enter the race, this
+        prevents spam.
 
-        Returns:
-            Text informing the user they have entered the race.
-            If they cannot join for any reason (look at notes) then
-            it will return silently with no response.
-
-        Notes:
-            Users cannot join if a race is not active, has 5 (exluding the bot)
-            or more players, or is already in the race.
         """
-        author = ctx.message.author
-
-        bank = self.bot.get_cog('Economy').bank
-        if not bank.account_exists(author):
-            await self.bot.say("{} you need to register a bank account before racing.".format(escape_message(author.nick or author.name)))
+        if self.started:
             return
-
-        await self._start_race(ctx)
-
-        data = self.check_server(author.server)
-
-        if data['Race Start']:
-            return
-        elif not data['Race Active']:
-            return
-        elif author.id in data['Players']:
-            return
-        elif len(data['Players']) >= 10:
-            await self.bot.say("**{}** sorry the race is full!".format(escape_message(author.nick or author.name)))
-            return
+        elif not self.active:
+            return await ctx.send("A race must be started before you can enter.")
+        elif ctx.author in self.players:
+            return await ctx.send("You have already entered the race.")
+        elif len(self.players) >= 14:
+            return await ctx.send("The maximum number of players has been reached.")
         else:
-            data['Players'][author.id] = {}
-            await self.bot.say("**{}** entered the race!".format(escape_message(author.nick or author.name)))
+            self.players.append(ctx.author)
+            await ctx.send(f"{ctx.author.mention} has joined the race.")
 
-    # @race.command(name="claim", pass_context=True)
-    async def _claim_race(self, ctx):
-        """Claim your prize from the animal race
+    @race.command(hidden=True)
+    @checks.admin_or_permissions(administrator=True)
+    async def clear(self, ctx):
+        """ONLY USE THIS COMMAND FOR DEBUG PURPOSES
 
-        Returns:
-                One of three outcomes based on result
-            :Text output giving random credits from 10-100
-            :Text output telling you are not the winner
-            :Text output telling you to get a bank account
+        You shouldn't use this command unless the race is stuck
+        or you are debugging."""
+        self.clear_local()
+        await ctx.send("Race cleared")
 
-        Raises:
-            cogs.economy.NoAccount Error when bank account not found.
+    @race.command()
+    @checks.admin_or_permissions(administrator=True)
+    async def wipe(self, ctx):
+        """This command will wipe ALL race data.
 
-        Notes:
-            If you do not have a bank account with economy, the bot will take your money
-            and spend it on cheap booze and potatoes.
+        You are given a confirmation dialog when using this command.
+        If you decide to wipe your data, all stats and settings will be deleted.
         """
-        author = ctx.message.author
-        data = self.check_server(author.server)
-        settings = self.check_config(author.server)
+        await ctx.send(f"You are about to clear all race data including stats and settings. "
+                       f"If you are sure you wish to proceed, type `{ctx.prefix}yes`.")
+        choices = (f"{ctx.prefix}yes", f"{ctx.prefix}no")
+        check = lambda m: (m.author == ctx.author and m.channel == ctx.channel
+                           and m.content in choices)
+        try:
+            choice = await ctx.bot.wait_for("message", timeout=20.0, check=check)
+        except asyncio.TimeoutError:
+            return await ctx.send("No response. Race wipe cancelled.")
 
-        if data['Race Active']:
+        if choice.content.lower() == f"{ctx.prefix}yes":
+            await self.db.guild(ctx.guild).clear()
+            await self.db.clear_all_members(ctx.guild)
+            return await ctx.send("Race data has been wiped.")
+        else:
+            return await ctx.send("Race wipe cancelled.")
+
+    @race.command()
+    async def version(self, ctx):
+        """Displays the version of race"""
+        await ctx.send(f"You are running race version {__version__}.")
+
+    @commands.group()
+    @checks.admin_or_permissions(administrator=True)
+    async def setrace(self, ctx):
+        """Race settings commands"""
+        pass
+
+    @setrace.command()
+    async def wait(self, ctx, wait: int):
+        """Changes the wait time before a race starts.
+
+        This only affects the period where race is still waiting
+        for more participants to join the race."""
+        if wait < 0:
+            return await ctx.send("Really? You're an idiot.")
+        await self.db.guild(ctx.guild).Wait.set(wait)
+        await ctx.send(f"Wait time before a race begins is now {wait} seconds.")
+
+    @setrace.group(name='bet')
+    async def _bet(self, ctx):
+        """Bet settings for race"""
+        pass
+
+    @_bet.command(name='min')
+    async def _min(self, ctx, amount: int):
+        """Sets the betting minimum."""
+        if amount < 0:
+            return await ctx.send("Come on now. Let's be reasonable.")
+        maximum = await self.db.guild(ctx.guild).Bet_Max()
+        if amount > maximum:
+            return await ctx.send(f"Minimum must be lower than the set max of {maximum}.")
+
+        await self.db.guild(ctx.guild).Bet_Min.set(amount)
+        await ctx.send(f"Minimum bet amount set to {amount}.")
+
+    @_bet.command(name='max')
+    async def _max(self, ctx, amount: int):
+        """Sets the betting maximum."""
+        if amount < 0:
+            return await ctx.send("Come on now. Let's be reasonable.")
+        minimum = await self.db.guild(ctx.guild).Bet_Min()
+        if amount < minimum:
+            return await ctx.send(f"Maximum must be higher than the set min of {minimum}.")
+
+        await self.db.guild(ctx.guild).Bet_Max.set(amount)
+        await ctx.send(f"Maximum bet amount set to {amount}.")
+
+    @_bet.command()
+    async def multiplier(self, ctx, multiplier: float):
+        """Sets the betting multiplier."""
+        if multiplier < 0:
+            return await ctx.send("So... you want them to lose money...when they win."
+                                  "I'm not doing that.")
+        if multiplier == 0:
+            return await ctx.send("That means they win nothing. Just turn off betting.")
+
+        await self.db.guild(ctx.guild).Bet_Multiplier.set(multiplier)
+        await ctx.send(f"Betting multiplier set to {multiplier}.")
+
+    @_bet.command()
+    async def toggle(self, ctx):
+        """Toggles betting on and off."""
+        current = await self.db.guild(ctx.guild).Bet_Allowed()
+        await self.db.guild(ctx.guild).Bet_Allowed.set(not current)
+        await ctx.send(f"Betting is now {'OFF' if current else 'ON'}.")
+
+    @setrace.command()
+    async def mode(self, ctx, mode: str):
+        """Changes the race mode
+
+        Race can either be in normal mode or Clone mode.
+
+        Normal Mode:
+            All racers are turtles.
+
+        Clones Mode:
+            Racers are randomly selected from a list of Clones with
+            different attributes.
+        """
+        if mode.lower() not in ('clones', 'normal'):
+            return await ctx.send("Must select either `clones` or `normal` as a mode.")
+
+        await self.db.guild(ctx.guild).Mode.set(mode.lower())
+        await ctx.send(f"Mode changed to {mode.lower()}")
+
+    @setrace.command()
+    async def prize(self, ctx, prize: int):
+        """Sets the prize pool for winners.
+
+        Set the prize to 0 if you do not wish any credits to be distributed.
+
+        When prize pooling is enabled (see `setrace pool`) the prize will be
+        distributed as follows:
+            1st place 60%
+            2nd place 30%
+            3rd place 10%.
+
+        Example:
+            100 results in 60, 30, 10
+            130 results in 78, 39, 13
+
+        When prize pooling is disabled, only first place will win, and they take
+        100% of the winnings.
+        """
+        if prize < 0:
+            return await ctx.send("... that's not how prizes work buddy.")
+
+        if prize == 0:
+            return await ctx.send("No prizes will be awarded to the winners.")
+        else:
+            currency = await bank.get_currency_name(ctx.guild)
+            await self.db.guild(ctx.guild).Prize.set(prize)
+            await ctx.send(f"Prize set for {prize} {currency}.")
+
+    @setrace.command(name='togglepool')
+    async def _tooglepool(self, ctx):
+        """Toggles on/off prize pooling.
+
+        Makes it so that prizes are pooled between 1st, 2nd, and 3rd.
+        It's a 60/30/10 split rounded to the nearest whole number.
+
+        There must be at least four human players, otherwise, only first
+        place wins.
+        """
+        pool = await self.db.guild(ctx.guild).Pooling()
+        await self.db.guild(ctx.guild).Pooling.set(not pool)
+        await ctx.send(f"Prize pooling is now {'OFF' if pool else 'ON'}.")
+
+    @setrace.command()
+    async def payoutmin(self, ctx, players: int):
+        """Sets the number of players needed to payout prizes and bets.
+
+        This sets the required number of players needed to payout prizes.
+        If the number of racers aren't met, then nothing is paid out.
+
+        If you want race to always pay out, then set players to 0.
+        """
+        if players < 0:
+            return await ctx.send("I don't have time for this shit.")
+        await self.db.guild(ctx.guild).Payout_Min.set(players)
+        if players == 0:
+            await ctx.send("Races will now always payout.")
+        else:
+            await ctx.send(f"Races will only payout if there are {players} human players.")
+
+    async def stats_update(self):
+        names = [player for player, emoji in self.winners]
+        for player in self.players:
+            if player in names:
+                position = names.index(player) + 1
+                current = await self.db.member(player).Wins.get_raw(str(position))
+                await self.db.member(player).Wins.set_raw(str(position), value=current+1)
+            else:
+                current = await self.db.member(player).Losses()
+                await self.db.member(player).Losses.set(current+1)
+
+    async def _race_teardown(self, settings):
+        await self.stats_update()
+        await self.distribute_prizes(settings)
+        await self.bet_payouts(settings)
+        self.clear_local()
+
+    def clear_local(self):
+        self.players.clear()
+        self.winners.clear()
+        self.bets.clear()
+        self.active = False
+        self.started = False
+
+    async def distribute_prizes(self, settings):
+        if settings["Prize"] == 0 or (settings["Payout_Min"] > len(self.players)):
             return
 
-        if data['Winner'] != author:
-            return await self.bot.say("Scram kid. You didn't win nothing yet.")
-        try:
-            bank = self.bot.get_cog('Economy').bank
-        except AttributeError:
-            return await self.bot.say("Economy is not loaded.")
-
-        prize_range = settings['Prize']
-        prize = random.randint(*prize_range)
-
-        try:  # Because people will play games for money without a fucking account smh
-            bank.deposit_credits(author, prize)
-        except Exception as e:
-            print('{} raised {} because they are stupid.'.format(escape_message(author.nick or author.name), type(e)))
-            await self.bot.say("We wanted to give you a prize, but you didn't have a bank "
-                               "account.\nTo teach you a lesson, your winnings are mine this "
-                               "time. Now go register!")
+        if settings["Pooling"] and len(self.players) > 3:
+            first, second, third = self.winners
+            for player, percentage in zip((first[0], second[0], third[0]), (0.6, 0.3, 0.1)):
+                if player.bot:
+                    continue
+                await bank.deposit_credits(player, int(settings["Prize"] * percentage))
         else:
-            await self.bot.say("After paying for animal feed, entrance fees, track fees, "
-                               "you get {} credits.".format(prize))
-        finally:
-            data['Winner'] = None
+            if self.winners[0][0].bot:
+                return
+            await bank.deposit_credits(self.winners[0][0], settings["Prize"])
 
-    def check_server(self, server):
-        if server.id in self.system:
-            return self.system[server.id]
+    async def bet_payouts(self, settings):
+        if not self.bets or not settings["Bet_Allowed"]:
+            return
+        multiplier = settings["Bet_Multiplier"]
+        first = self.winners[0]
+        for user, wagers in self.bets.items():
+            for jockey, bet in wagers["Bets"]:
+                if jockey == first:
+                    await bank.deposit_credits(user.id, (bet * multiplier))
+
+    async def bet_conditions(self, ctx, bet, user):
+        if not self.active:
+            await ctx.send("There isn't a race right now.")
+            return False
+        elif self.started:
+            await ctx.author.send("You can't place a bet after the race has started.")
+            return False
+        elif user not in self.players:
+            await ctx.send("You can't bet on someone who isn't in the race.")
+            return False
+        elif ctx.author in self.bets:
+            await ctx.send("You have already entered a bet for the race.")
+            return False
+
+        # Separated the logic such that calls to config only happen if the statements
+        # above pass.
+        data = await self.db.guild(ctx.guild).all()
+        allowed = data["Bet_Allowed"]
+        minimum = data["Bet_Min"]
+        maximum = data["Bet_Max"]
+
+        if not allowed:
+            await ctx.send("Betting has been turned off.")
+            return False
+        elif not await bank.can_spend(ctx.author, bet):
+            await ctx.send("You do not have enough money to cover the bet.")
+        elif minimum <= bet <= maximum:
+            return True
         else:
-            self.system[server.id] = {
-                'Race Start': False,
-                'Race Active': False,
-                'Players': {},
-                'Mode': None,
-                'Winner': None,
-                'First': None,
-                'Second': None,
-                'Third': None
-            }
-            return self.system[server.id]
+            await ctx.send(f"Bet must not be lower than {minimum} or higher than {maximum}.")
+            return False
 
-    def check_config(self, server):
-        if server.id in self.config['Servers']:
-            return self.config['Servers'][server.id]
+    def _build_end_screen(self, settings, currency, color):
+        if len(self.winners) == 3:
+            first, second, third = self.winners
         else:
-            self.config['Servers'][server.id] = {'Prize': (1, 100), 'Mode': 'standard', 'Time': 60}
-            self.save_settings()
-            return self.config['Servers'][server.id]
+            first, second, = self.winners
+            third = None
+        payout_msg = self._payout_msg(settings, currency)
+        footer = self._get_bet_winners(first[0])
+        race_config = (f"Prize: {settings['Prize']} {currency}\n"
+                       f"Prize Pooling: {'ON' if settings['Pooling'] else 'OFF'}\n"
+                       f"Players needed for payout: {settings['Payout_Min']}\n"
+                       f"Betting Allowed: {'YES' if settings['Bet_Allowed'] else 'NO'}")
+        embed = discord.Embed(colour=color, title="Race Results")
+        embed.add_field(name=f'{first[0].name} 🥇', value=first[1].emoji)
+        embed.add_field(name=f'{second[0].name} 🥈', value=second[1].emoji)
+        if third:
+            embed.add_field(name=f'{third[0].name} 🥉', value=third[1].emoji)
+        embed.add_field(name='-' * 90, value="\u200b")
+        embed.add_field(name="Payouts", value=payout_msg)
+        embed.set_footer(text=f"Bet winners: {footer}")
+        mentions = '' if first[0].bot else f'{first[0].mention}'
+        mentions += '' if second[0].bot else f', {second[0].mention}'
+        mentions += '' if third is None or third[0].bot else f', {third[0].mention}'
+        return mentions, embed
 
-    def game_teardown(self, data, force=False):
-        if data['Winner'] == self.bot.user or force:
-            data['Winner'] = None
-        data['Race Active'] = False
-        data['Race Start'] = False
-        data['Mode'] = None
-        data['First'] = None
-        data['Second'] = None
-        data['Third'] = None
-        data['Players'].clear()
+    def _payout_msg(self, settings, currency):
+        if settings["Prize"] == 0:
+            return "No prize money was distributed."
+        elif settings["Payout_Min"] > len(self.players):
+            return "Not enough racers to give prizes."
+        elif not settings["Pooling"] or len(self.players) < 4:
+            if self.winners[0][0].bot:
+                return f"{self.winners[0][0]} is the winner!"
+            return f"{self.winners[0][0]} received {settings['Prize']} {currency}."
+        if settings["Pooling"]:
+            msg = ''
+            first, second, third = self.winners
+            for player, percentage in zip((first[0], second[0], third[0]), (0.6, 0.3, 0.1)):
+                print(player)
+                if player.bot:
+                    continue
+                msg += f'{player.name} received {int(settings["Prize"] * percentage)} {currency}'
+            return msg
 
-    def save_settings(self):
-        dataIO.save_json('data/race/race.json', self.config)
+    def _get_bet_winners(self, winner):
+        bet_winners = []
+        for better in self.bets:
+            for jockey, _ in self.bets[better]["Bets"]:
+                if jockey == winner:
+                    bet_winners.append(better.name)
+        return ', '.join(bet_winners) if bet_winners else ''
 
-    def game_setup(self, author, data, mode):
-
-        racers = []
-
-        if mode == 'zoo':
-            if len(data['Players']) == 1:
-                bot_set = random.choice(animals)
-                racers = [Racer(bot_set[0], bot_set[1], self.bot.user)]
-
-            for user in data['Players']:
-                mobj = author.server.get_member(user)
-                animal_set = random.choice(animals)
-                racers.append(Racer(animal_set[0], animal_set[1], mobj))
-        elif mode == 'clashofclans':
-            if len(data['Players']) == 1:
-                bot_set = random.choice(clash_characters)
-                racers = [Racer(bot_set[0], bot_set[1], self.bot.user)]
-
-            for user in data['Players']:
-                mobj = author.server.get_member(user)
-                animal_set = random.choice(clash_characters)
-                racers.append(Racer(animal_set[0], animal_set[1], mobj))
+    async def _game_setup(self, ctx):
+        mode = await self.db.guild(ctx.guild).Mode()
+        users = self.players
+        if mode == 'clones':
+            players = [(Clones(*random.choice(racers)), user) for user in users]
+            if len(players) == 1:
+                players.append((Clones(*random.choice(racers)), ctx.bot.user))
         else:
-            animal_set = (":turtle:", "slow")
-            if len(data['Players']) == 1:
-                racers = [Racer(animal_set[0], animal_set[1], self.bot.user)]
+            players = [(Clones('<:BigSmith:560208349430284303>', 'slow'), user) for user in users]
+            if len(players) == 1:
+                players.append((Clones('<:BigSmith:560208349430284303>', 'slow'), ctx.bot.user))
+        return players
 
-            for user in data['Players']:
-                mobj = author.server.get_member(user)
-                racers.append(Racer(animal_set[0], animal_set[1], mobj))
+    async def run_game(self, ctx):
+        players = await self._game_setup(ctx)
+        setup = "\u200b\n" + '\n'.join(f":carrot: **{clones.current}** 🏁"  
+                                       f"[{jockey.name}]" for clones, jockey in players)
+        track = await ctx.send(setup)
+        counter = 0
+        while not all(clones.position == 0 for clones, jockey in players):
 
-        return racers
-
-    async def run_game(self, racers, game, data):
-        finished_racers = []
-        while True:
             await asyncio.sleep(2.0)
-            for player in racers:
-                player.update_position()
-                position = player.get_position()
-                if position == 0:
-                    if not player.placed:
-                        player.speed = player.turn + player.last_position / player.last_move
-                        player.placed = True
-                        finished_racers.append(player)
-
-            field = [player.field(data['Mode']) for player in racers]
-            await self.bot.edit_message(game, '\n'.join(field))
-
-            if [player.get_position() for player in racers].count(0) == len(racers):
-                break
-        
-        finished_racers = sorted(finished_racers, key=lambda x: x.speed)
-        data['Winner'] = finished_racers[0].user
-        data['First'] = (finished_racers[0].user, finished_racers[0].animal, finished_racers[0].speed)
-        data['Second'] = (finished_racers[1].user, finished_racers[1].animal, finished_racers[1].speed)
-        if len(finished_racers) > 2:
-            data['Third'] = (finished_racers[2].user, finished_racers[2].animal, finished_racers[2].speed)
-
-        prize = random.randint(10, 100)
-        data['Prize'] = prize
-
-
-def check_folders():
-    if not os.path.exists('data/race'):
-        print("Creating data/race folder...")
-        os.makedirs('data/race')
-
-
-def check_files():
-    system = {"Servers": {}}
-
-    f = 'data/race/race.json'
-    if not dataIO.is_valid_json(f):
-        print('data/race/race.json')
-        dataIO.save_json(f, system)
-
-
-def setup(bot):
-    check_folders()
-    check_files()
-    bot.add_cog(Race(bot))
+            fields = []
+            for clones, jockey in players:
+                if clones.position == 0:
+                    fields.append(f":carrot: **{clones.current}** 🏁  [{jockey.name}]")
+                    continue
+                clones.move()
+                fields.append(f":carrot: **{clones.current}** 🏁  [{jockey.name}]")
+                if clones.position == 0 and len(self.winners) < 3:
+                    self.winners.append((jockey, clones))
+            t = "\u200b\n" + "\n".join(fields)
+            # There is a display bug in discord that requires this if.
+            if counter == 0:
+                await track.edit(content='')
+            await track.edit(content=t)
+            counter += 1
