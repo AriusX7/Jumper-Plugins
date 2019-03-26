@@ -4,6 +4,6 @@
     "name" : "Race",
     "short" : "Race Clones against your friends and the bot.",
     "description" : "Race Clones against your friends. Allows for currency prizes, betting, and stat tracking.",
-    "tags" : ["Games", "Race", "Turtles", "Economy"],
+    "tags" : ["Games", "Race", "Clones", "Economy"],
     "min_python_version": [3, 6, 0]
 }
