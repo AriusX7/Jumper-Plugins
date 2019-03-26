@@ -463,9 +463,9 @@ class Race(commands.Cog):
             if len(players) == 1:
                 players.append((Clones(*random.choice(racers)), ctx.bot.user))
         else:
-            players = [(Clones(“<:BigSmith:560208349430284303>", "slow"), user) for user in users]
+            players = [(Clones("<:BigSmith:560208349430284303>", "slow"), user) for user in users]
             if len(players) == 1:
-                players.append((Clones(“:<:BigSmith:560208349430284303>", "slow"), ctx.bot.user))
+                players.append((Clones(":<:BigSmith:560208349430284303>", "slow"), ctx.bot.user))
         return players
 
     async def run_game(self, ctx):
