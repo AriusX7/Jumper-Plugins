@@ -408,20 +408,30 @@ class Race(commands.Cog):
         else:
             first, second, = self.winners
             third = None
-        payout_msg = self._payout_msg(settings, currency)
-        footer = self._get_bet_winners(first[0])
-        race_config = (f"Prize: {settings['Prize']} {currency}\n"
-                       f"Prize Pooling: {'ON' if settings['Pooling'] else 'OFF'}\n"
-                       f"Players needed for payout: {settings['Payout_Min']}\n"
-                       f"Betting Allowed: {'YES' if settings['Bet_Allowed'] else 'NO'}")
-        embed = discord.Embed(colour=color, title="Race Results")
-        embed.add_field(name=f'{first[0].name} 🥇', value=first[1].emoji)
-        embed.add_field(name=f'{second[0].name} 🥈', value=second[1].emoji)
-        if third:
-            embed.add_field(name=f'{third[0].name} 🥉', value=third[1].emoji)
-        embed.add_field(name='-' * 90, value="\u200b")
-        embed.add_field(name="Payouts", value=payout_msg)
-        embed.set_footer(text=f"Bet winners: {footer}")
+                       
+        # footer = "Type {}race claim to receive prize money. You must claim it before the next race!"
+        first = ':first_place:  {0}'.format(escape_message(data['First'][0].nick or data['First'][0].name))
+        fv = '{1}\n{2:.2f}s'.format(*data['First'])
+        fv = fv + '\nPrize: {0}'.format(prize)
+        second = ':second_place: {0}'.format(escape_message(data['Second'][0].nick or data['Second'][0].name))
+        sv = '{1}\n{2:.2f}s'.format(*data['Second'])
+        sv = sv + '\nPrize: {0}'.format(int(prize*0.75))
+        if data['Third']:
+            third = ':third_place:  {0}'.format(escape_message(data['Third'][0].nick or data['Third'][0].name))
+            tv = '{1}\n{2:.2f}s'.format(*data['Third'])
+            tv = tv + '\nPrize: {0}'.format(int(prize*0.5))
+        else:
+            third = ':third_place:'
+            tv = '--\n--'
+
+        embed = discord.Embed(colour=0x00CC33)
+        embed.add_field(name=first, value=fv)
+        embed.add_field(name=second, value=sv)
+        embed.add_field(name=third, value=tv)
+        embed.add_field(name='Bet earnings of {} credits:'.format(100 * len(data['Players'])), value=bet_earnings, inline=False)
+        # embed.add_field(name='-' * 99, value='{} is the winner!'.format(data['Winner']))
+        embed.title = "Race Results"
+        # embed.set_footer(text=footer.format(ctx.prefix))
         mentions = '' if first[0].bot else f'{first[0].mention}'
         mentions += '' if second[0].bot else f', {second[0].mention}'
         mentions += '' if third is None or third[0].bot else f', {third[0].mention}'
@@ -491,3 +501,5 @@ class Race(commands.Cog):
                 await track.edit(content='')
             await track.edit(content=t)
             counter += 1
+
+                       
