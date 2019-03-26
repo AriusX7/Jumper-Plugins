@@ -458,7 +458,7 @@ class Race(commands.Cog):
     async def _game_setup(self, ctx):
         mode = await self.db.guild(ctx.guild).Mode()
         users = self.players
-        if mode == ‘clone’:
+        if mode == ‘clones’:
             players = [(Clones(*random.choice(racers)), user) for user in users]
             if len(players) == 1:
                 players.append((Clones(*random.choice(racers)), ctx.bot.user))
