@@ -419,6 +419,7 @@ class Race(commands.Cog):
         embed.add_field(name=f'{second[0].name} 🥈', value=second[1].emoji)
         if third:
             embed.add_field(name=f'{third[0].name} 🥉', value=third[1].emoji)
+        embed.add_field(name='-' * 90, value="\u200b")
         embed.add_field(name="Payouts", value=payout_msg)
         embed.set_footer(text=f"Bet winners: {footer}")
         return embed
