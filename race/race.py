@@ -432,10 +432,6 @@ class Race(commands.Cog):
         # embed.add_field(name='-' * 99, value='{} is the winner!'.format(data['Winner']))
         embed.title = "Race Results"
         # embed.set_footer(text=footer.format(ctx.prefix))
-        mentions = '' if first[0].bot else f'{first[0].mention}'
-        mentions += '' if second[0].bot else f', {second[0].mention}'
-        mentions += '' if third is None or third[0].bot else f', {third[0].mention}'
-        return mentions, embed
 
     def _payout_msg(self, settings, currency):
         if settings["Prize"] == 0:
