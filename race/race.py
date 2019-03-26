@@ -251,12 +251,12 @@ class Race(commands.Cog):
         Normal Mode:
             All racers are turtles.
 
-        Clone Mode:
+        Clones Mode:
             Racers are randomly selected from a list of Clones with
             different attributes.
         """
-        if mode.lower() not in ('Clone', 'normal'):
-            return await ctx.send("Must select either `Clone` or `normal` as a mode.")
+        if mode.lower() not in ('clones', 'normal'):
+            return await ctx.send("Must select either `clones` or `normal` as a mode.")
 
         await self.db.guild(ctx.guild).Mode.set(mode.lower())
         await ctx.send(f"Mode changed to {mode.lower()}")
