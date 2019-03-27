@@ -12,7 +12,7 @@ from redbot.core import Config, bank, commands, checks
 import discord
 
 # Race
-from .clones import Clones, racers
+from .clones import Clone, racers
 
 __author__ = "Redjumpman"
 __version__ = "2.0.12"
@@ -33,7 +33,7 @@ member_defaults = {"Wins": {"1": 0, "2": 0, "3": 0}, "Losses": 0}
 
 
 class Race(commands.Cog):
-    """Cog for racing Clones"""
+    """Cog for racing Clones”””
 
     def __init__(self):
         self.db = Config.get_conf(self, 5074395009, force_registration=True)
@@ -249,14 +249,14 @@ class Race(commands.Cog):
         Race can either be in normal mode or Clone mode.
 
         Normal Mode:
-            All racers are turtles.
+            All racers are Big Smiths.
 
-        Clones Mode:
+        Clone Mode:
             Racers are randomly selected from a list of Clones with
             different attributes.
         """
-        if mode.lower() not in ('clones', 'normal'):
-            return await ctx.send("Must select either `clones` or `normal` as a mode.")
+        if mode.lower() not in (‘clone’, 'normal'):
+            return await ctx.send("Must select either `clone` or `normal` as a mode.")
 
         await self.db.guild(ctx.guild).Mode.set(mode.lower())
         await ctx.send(f"Mode changed to {mode.lower()}")
@@ -421,8 +421,12 @@ class Race(commands.Cog):
             embed.add_field(name=f'{third[0].name} 🥉', value=third[1].emoji)
         embed.add_field(name='-' * 90, value="\u200b")
         embed.add_field(name="Payouts", value=payout_msg)
+        embed.add_field(name="Settings", value=race_config)
         embed.set_footer(text=f"Bet winners: {footer}")
-        return embed
+        mentions = '' if first[0].bot else f'{first[0].mention}'
+        mentions += '' if second[0].bot else f', {second[0].mention}'
+        mentions += '' if third is None or third[0].bot else f', {third[0].mention}'
+        return mentions, embed
 
     def _payout_msg(self, settings, currency):
         if settings["Prize"] == 0:
@@ -454,34 +458,35 @@ class Race(commands.Cog):
     async def _game_setup(self, ctx):
         mode = await self.db.guild(ctx.guild).Mode()
         users = self.players
-        if mode == 'clones':
-            players = [(Clones(*random.choice(racers)), user) for user in users]
+        if mode == ‘clone’:
+            players = [(Clone(*random.choice(racers)), user) for user in users]
             if len(players) == 1:
-                players.append((Clones(*random.choice(racers)), ctx.bot.user))
+                players.append((Clone(*random.choice(racers)), ctx.bot.user))
         else:
-            players = [(Clones('<:BigSmith:560208349430284303>', 'slow'), user) for user in users]
+            players = [(Clone('<:BigSmith:560208349430284303>', 'slow'), user) for user in users]
             if len(players) == 1:
-                players.append((Clones('<:BigSmith:560208349430284303>', 'slow'), ctx.bot.user))
+                players.append((Clone('<:BigSmith:560208349430284303>', 'slow'), ctx.bot.user))
         return players
 
     async def run_game(self, ctx):
         players = await self._game_setup(ctx)
-        setup = "\u200b\n" + '\n'.join(f"<:bb_gem:560226360727961620> **{clones.current}** 🏁"  
-                                       f"[{jockey.name}]" for clones, jockey in players)
+        setup = "\u200b\n" + '\n'.join(f"<:bb_gem:560226360727961620>
+**{clone.current}** 🏁"  
+                                       f"[{jockey.name}]" for clone, jockey in players)
         track = await ctx.send(setup)
         counter = 0
-        while not all(clones.position == 0 for clones, jockey in players):
+        while not all(clone.position == 0 for clone, jockey in players):
 
             await asyncio.sleep(2.0)
             fields = []
-            for clones, jockey in players:
-                if clones.position == 0:
-                    fields.append(f"<:bb_gem:560226360727961620> **{clones.current}** 🏁  [{jockey.name}]")
+            for clone, jockey in players:
+                if clone.position == 0:
+                    fields.append(f"<:bb_gem:560226360727961620> **{clone.current}** 🏁  [{jockey.name}]")
                     continue
-                clones.move()
-                fields.append(f"<:bb_gem:560226360727961620> **{clones.current}** 🏁  [{jockey.name}]")
-                if clones.position == 0 and len(self.winners) < 3:
-                    self.winners.append((jockey, clones))
+                clone.move()
+                fields.append(f"<:bb_gem:560226360727961620> **{clone.current}** 🏁  [{jockey.name}]")
+                if clone.position == 0 and len(self.winners) < 3:
+                    self.winners.append((jockey, clone))
             t = "\u200b\n" + "\n".join(fields)
             # There is a display bug in discord that requires this if.
             if counter == 0:
