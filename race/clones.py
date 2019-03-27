@@ -12,7 +12,7 @@ racers = (('<:DoggoHorde:560208530724880477>', 'fast'), ('<:SpinningSaw:56020859
           ('<:StickyBomb:560208588891750410>', 'slow'), ('<:PlainBomb:560208528590241853>', 'slow'), ('<:MiniBomb:560208528053108761>', 'slow'))
 
 
-class Clones:
+class Clone:
     def __init__(self, emoji, _type):
         self.emoji = emoji
         self._type = _type
