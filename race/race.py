@@ -33,7 +33,7 @@ member_defaults = {"Wins": {"1": 0, "2": 0, "3": 0}, "Losses": 0}
 
 
 class Race(commands.Cog):
-    """Cog for racing Clones”””
+    """Cog for racing clones"""
 
     def __init__(self):
         self.db = Config.get_conf(self, 5074395009, force_registration=True)
@@ -246,16 +246,16 @@ class Race(commands.Cog):
     async def mode(self, ctx, mode: str):
         """Changes the race mode
 
-        Race can either be in normal mode or Clone mode.
+        Race can either be in normal mode or clone mode.
 
         Normal Mode:
-            All racers are Big Smiths.
+            All racers are turtles.
 
         Clone Mode:
-            Racers are randomly selected from a list of Clones with
+            Racers are randomly selected from a list of clones with
             different attributes.
         """
-        if mode.lower() not in (‘clone’, 'normal'):
+        if mode.lower() not in ('clone', 'normal'):
             return await ctx.send("Must select either `clone` or `normal` as a mode.")
 
         await self.db.guild(ctx.guild).Mode.set(mode.lower())
@@ -458,20 +458,19 @@ class Race(commands.Cog):
     async def _game_setup(self, ctx):
         mode = await self.db.guild(ctx.guild).Mode()
         users = self.players
-        if mode == ‘clone’:
+        if mode == 'clone':
             players = [(Clone(*random.choice(racers)), user) for user in users]
             if len(players) == 1:
                 players.append((Clone(*random.choice(racers)), ctx.bot.user))
         else:
-            players = [(Clone('<:BigSmith:560208349430284303>', 'slow'), user) for user in users]
+            players = [(Clone("<:BigSmith:560208349430284303>", "slow"), user) for user in users]
             if len(players) == 1:
-                players.append((Clone('<:BigSmith:560208349430284303>', 'slow'), ctx.bot.user))
+                players.append((Clone("<:BigSmith:560208349430284303>", "slow"), ctx.bot.user))
         return players
 
     async def run_game(self, ctx):
         players = await self._game_setup(ctx)
-        setup = "\u200b\n" + '\n'.join(f"<:bb_gem:560226360727961620>
-**{clone.current}** 🏁"  
+        setup = "\u200b\n" + '\n'.join(f"<:bb_gem:560226360727961620> **{clone.current}** 🏁"  
                                        f"[{jockey.name}]" for clone, jockey in players)
         track = await ctx.send(setup)
         counter = 0
@@ -493,3 +492,5 @@ class Race(commands.Cog):
                 await track.edit(content='')
             await track.edit(content=t)
             counter += 1
+
+
