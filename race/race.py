@@ -297,7 +297,7 @@ class Race(commands.Cog):
         Makes it so that prizes are pooled between 1st, 2nd, and 3rd.
         It's a 60/30/10 split rounded to the nearest whole number.
 
-        There must be at least four human players, otherwise, only first
+        There must be at least three human players, otherwise, only first
         place wins.
         """
         pool = await self.db.guild(ctx.guild).Pooling()
