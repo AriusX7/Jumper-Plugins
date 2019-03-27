@@ -56,7 +56,7 @@ class Clone:
             else:
                 return random.randint(2, 5) * 3
 
-        elif self._type == ':unicorn:':
+        elif self._type == 'special':
             if self.turn % 3:
                 return random.choice([len('blue'), len('red'), len('green')]) * 3
             else:
