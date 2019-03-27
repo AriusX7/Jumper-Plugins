@@ -52,7 +52,7 @@ class Race(commands.Cog):
         pass
 
     @race.command()
-    async def start(self, ctx):
+    async def enter(self, ctx):
         """Begins a new race.
 
         You cannot start a new race until the active on has ended.
@@ -419,9 +419,7 @@ class Race(commands.Cog):
         embed.add_field(name=f'{second[0].name} 🥈', value=second[1].emoji)
         if third:
             embed.add_field(name=f'{third[0].name} 🥉', value=third[1].emoji)
-        embed.add_field(name='-' * 90, value="\u200b")
         embed.add_field(name="Payouts", value=payout_msg)
-        embed.add_field(name="Settings", value=race_config)
         embed.set_footer(text=f"Bet winners: {footer}")
         mentions = '' if first[0].bot else f'{first[0].mention}'
         mentions += '' if second[0].bot else f', {second[0].mention}'
