@@ -441,7 +441,7 @@ class Race(commands.Cog):
                 print(player)
                 if player.bot:
                     continue
-                msg += f'{player.name} received {int(settings["Prize"] * percentage)} {currency}' + "\n"
+                msg += f'**{player.name}** received **{int(settings["Prize"] * percentage)}** {currency}' + "\n"
             return msg
 
     def _get_bet_winners(self, winner):
