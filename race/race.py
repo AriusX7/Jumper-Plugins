@@ -430,7 +430,7 @@ class Race(commands.Cog):
             return "No prize money was distributed."
         elif settings["Payout_Min"] > len(self.players):
             return "Not enough racers to give prizes."
-        elif not settings["Pooling"] or len(self.players) < 4:
+        elif not settings["Pooling"] or len(self.players) < 3:
             if self.winners[0][0].bot:
                 return f"{self.winners[0][0]} is the winner!"
             return f"{self.winners[0][0]} received {settings['Prize']} {currency}."
